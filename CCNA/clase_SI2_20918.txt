@@ -1,0 +1,139 @@
+Clase 21/septiembre/2018 Seguridad Informática II
+
+Autor: José Alberto Martínez Lara
+
+Descargar 
+- Metasplitaible
+- Kali
+
+apagar bsd shutdown -h now (halt)
+6 niveles de ejecución de linux (6 func red, multiusuario, ambiente gráfico)
+
+BSD 3 niveles de ejecución (0 apagado, 1 single user, 2 capacidades multiusuario y red)
+
+bridged - link directo al hardwaare de la tarjeta de windows y entre tarjeta de MV Vmnet0
+NAT - a partir de una ip se generan más ip Vmnet8
+host only - redes entre máquinas virtuales y host sin salida a internet, sólo Vmnet1
+custom - personaliada
+
+
+
+Construccion de firewall por estado
+
+Realidad
+
+	     Internet
+		|
+		|
+	      Router
+		|
+		|
+	     Firewall
+		|
+		|
+	      Switch
+	________|________
+	|	|	|
+	M1	M2	M3
+
+
+Virtual (simulación)
+
+   LAN		 Firewall	 Internet
+ ________	 ________	 ________
+|	 |	|	 |	|	 |
+|	||------||	||------||	 |
+|________|	|________|	|________|
+vmnet4 em0 vmnet em0 vmnet5 em1	 em0 vmnet5
+
+
+Un firewall une dos redes, una segura y una insegura
+
+Fireawall permite o niega el tráfico a través de flitros. No es un router, gateway, nat
+sh revisa la configuración del archivo y la carga al SO
+
+1.- Clonar la MV de OpenBSD 2 veces (click derecho>manage>clone>fullclone)
+2.- Una MV representa a una LAN (Vmnet4), otra representa el firewall (Vmnet4 con vic0 LAN)(Vmnet5 vic1 Internet) y otra Internet (Vmnet5)
+3.- EN la máquina Firewall configurar de la siguiente manera
+
+	Revisar vi
+	modo comando:
+		i = insert/write
+		a = append/write
+		o = write on an upper line
+		O = write on a lower line
+		x = borrar un caracter	|
+		dd = borrar una línea	| Se puede anteponer un número para específicar el número a borrar
+		:w = guarda
+		:q = salir
+		:q! = fuerza la salida sin guardar
+		:wq! = x! = guardar y salir
+
+
+	a) /etc/hostname.NIC#
+	b) media autoselect up
+	c) /etc/hostname.bridge0 #crea un bridge lógico entre las interfaces para mover los paquetes de una tarjeta a otra
+	d) add NIC0 add NIC1 up
+	e) /etc/sysctl.conf #habilita caracteristica de kernel, forward de paquetes entre tarjetas.
+	f) net.inet.ip.forwarding=1
+	g)* /etc/rc.conf revisar linea PF=YES
+	h) reiniciar el SO
+4.- Configurar IP's en LAN e Internet
+	a) /etc/hostname.NIC#
+	b) inet 10.10.10.10 255.255.255.0 NONE
+	c) sh /etc/netstart
+5.- Revisar la configuración de Firewall con ifconfig y 
+	interfaces
+		media reconoce el tipo
+		status:active
+	bridge
+		
+	pflog por pf=YES identificar y corregir errores
+6.- Reglas del Firewall
+	a) /etc/pf.conf
+	b) pfctl 
+		-f	archivo de reglas
+		-e	enable
+		-d	disable
+		-o	opciones
+		-sr	show rules
+		-ss	show states
+		-si	show information
+		-sm	show parámetros
+		-k	cerrar conexiones
+	c) borrar todo lo del archiv y poner pass all
+	d) ejecutar pfctl -f /etc/pf.conf -e -o none #cada cambio es usar este comando
+		revisa la sintaxis y lo acepta, carga las reglas
+	e) revisar que las cargó
+		pfctl -sr
+		si se hace ping de LAN a internet hay respuesta
+	f) comentar la anterior regla (pass all) y poner drop all
+		si se hace ping de LAN a internet no hay respuesta, el firewall descarta todos los paquetes de LAN y este no recibe respuesta
+7.- Hacer las reglas para los siguientes servicios
+
+	Servicios desde internet 	 _______________
+	Correo puerto 	25/TCP		|		|
+	http		80/TCP		|   Internet  	|
+	https		443/TCP		|_______________|
+	DNS		53/UDP			|
+	Ping	códigos 0-8/ICMP		|
+					 _______|_______
+					|___Firewall____|
+						|
+	Servicios desde LAN		 _______|_______
+	ssh		22/TCP		|		|
+					|	LAN	|
+					|_______________|
+
+	block all
+	pass in quick on em0 on proto tcp from 10.10.10.10
+		to 10.10.10.50 port 25
+	pass out quick on em 1 proto tcp from 10.10.10.10
+		to 10.10.10.50 port 25
+
+8.- hacer pruebas de las reglas
+	tcpdump -n -i em0 en firewall (-n no resolver nombres dns y -i para especificar la interfaz)
+	nc -l 80 escuchar por el puerto 25
+	nc ip 80
+	tcpdump -n -xX -s 1514 -i em1 host 10.10.10.10 para ver lo que se manda
+	

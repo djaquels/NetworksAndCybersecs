@@ -1,0 +1,4 @@
+Enter configuration commands, one per line.  End with CNTL/Z.
+Switch(config)#int range f0/1 - 24
+Switch(config-if-range)#switchport mode access
+Switch(config-if-range)#swithport voice vlan 
